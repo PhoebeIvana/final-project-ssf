@@ -1,0 +1,30 @@
+extern "C" {
+  void init_ADC();
+  void LCD_write();
+  void SPI_MAX7219_init();
+  void MAX7219_disp_text();
+  void HC_SR04_sensor();
+}
+
+// The setup function runs once when you press reset or power the board
+void setup() {
+  // Initialize the LCD and ADC (if ADC is needed for other purposes)
+  init_ADC();
+  LCD_write();  // Initializes the LCD and displays the initial text
+
+  // Initialize the MAX7219 display (if needed)
+  SPI_MAX7219_init();
+  MAX7219_disp_text();
+
+  // Initialize the ultrasonic sensor
+  HC_SR04_sensor();
+}
+
+// The loop function runs over and over again forever
+void loop() {
+  // Continuously measure distance and update the LCD
+  HC_SR04_sensor();  // This should measure the distance and update the LCD
+
+  // Optionally, add a delay if needed for sensor stability
+  delay(500);  // Wait for half a second before taking another reading
+}

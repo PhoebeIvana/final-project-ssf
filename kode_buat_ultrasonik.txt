@@ -1,0 +1,225 @@
+;---------------
+; Assembly Code
+;---------------
+#define __SFR_OFFSET 0x00
+#include "avr/io.h"
+;------------------------
+.global LCD_write
+.global init_ADC
+.global HC_SR04_sensor
+;====================================================================
+init_ADC:
+    SBI   DDRC, 0       ;set pin PC0 as i/p for ADC0
+    ;-------------------------------------------------------------
+    LDI   R20, 0xE0     ;internal 2.56V, left-justified data, ADC0
+    STS   ADMUX, R20
+    LDI   R20, 0x87     ;enable ADC, ADC prescaler CLK/128
+    STS   ADCSRA, R20
+    RET
+;------------------------------------------------------------------
+LCD_write:
+    LDI   R23, 48       ;constants used to get ASCII values
+    LDI   R24, 7        ;for chars 0-->9 & A-->F
+    ;--------------------------------------------------
+    LDI   R16, 0xFF
+    OUT   DDRD, R16     ;set port D o/p for data
+    OUT   DDRB, R16     ;set port B o/p for command
+    CBI   PORTB, 0      ;EN = 0
+    RCALL delay_ms      ;wait for LCD power on
+    ;--------------------------------------------------
+    RCALL LCD_init      ;subroutine to initialize LCD
+    ;--------------------------------------------------
+    RCALL disp_msg      ;display message on 1st line
+    ;--------------------------------------------------
+    LDI   R16, 0xC0     ;cursor beginning of 2nd line
+    RCALL command_wrt
+    RCALL delay_ms
+    ;--------------------------------------------------
+    RJMP  read_distance ;display ultrasonic sensor value on LCD
+;====================================================================
+LCD_init:
+    LDI   R16, 0x33     ;init LCD for 4-bit data
+    RCALL command_wrt   ;send to command register
+    RCALL delay_ms
+    LDI   R16, 0x32     ;init LCD for 4-bit data
+    RCALL command_wrt
+    RCALL delay_ms
+    LDI   R16, 0x28     ;LCD 2 lines, 5x7 matrix
+    RCALL command_wrt
+    RCALL delay_ms
+    LDI   R16, 0x0C     ;disp ON, cursor OFF
+    RCALL command_wrt
+    LDI   R16, 0x01     ;clear LCD
+    RCALL command_wrt
+    RCALL delay_ms
+    LDI   R16, 0x06     ;shift cursor right
+    RCALL command_wrt
+    RET  
+;====================================================================
+command_wrt:
+    MOV   R27, R16
+    ANDI  R27, 0xF0     ;mask low nibble & keep high nibble
+    OUT   PORTD, R27    ;o/p high nibble to port D
+    CBI   PORTB, 1      ;RS = 0 for command
+    SBI   PORTB, 0      ;EN = 1
+    RCALL delay_short   ;widen EN pulse
+    CBI   PORTB, 0      ;EN = 0 for H-to-L pulse
+    RCALL delay_us      ;delay 100us
+    ;-------------------------------------------------------
+    MOV   R27, R16
+    SWAP  R27           ;swap nibbles
+    ANDI  R27, 0xF0     ;mask low nibble & keep high nibble
+    OUT   PORTD, R27    ;o/p high nibble to port D
+    SBI   PORTB, 0      ;EN = 1
+    RCALL delay_short   ;widen EN pulse
+    CBI   PORTB, 0      ;EN = 0 for H-to-L pulse
+    RCALL delay_us      ;delay 100us
+    RET
+;====================================================================
+data_wrt:
+    MOV   R27, R16
+    ANDI  R27, 0xF0     ;mask low nibble & keep high nibble
+    OUT   PORTD, R27    ;o/p high nibble to port D
+    SBI   PORTB, 1      ;RS = 1 for data
+    SBI   PORTB, 0      ;EN = 1
+    RCALL delay_short   ;make wide EN pulse
+    CBI   PORTB, 0      ;EN = 0 for H-to-L pulse
+    RCALL delay_us      ;delay 100us
+    ;-------------------------------------------------------
+    MOV   R27, R16
+    SWAP  R27           ;swap nibbles
+    ANDI  R27, 0xF0     ;mask low nibble & keep high nibble
+    OUT   PORTD, R27    ;o/p high nibble to port D
+    SBI   PORTB, 0      ;EN = 1
+    RCALL delay_short   ;widen EN pulse
+    CBI   PORTB, 0      ;EN = 0 for H-to-L pulse
+    RCALL delay_us      ;delay in micro seconds
+    RET
+;====================================================================
+delay_short:            ;very short delay, 3 cycles
+    NOP
+    NOP
+    RET
+;--------------------------------------------------
+delay_us:               ;delay approximately 100us
+    LDI   R20, 90
+l1: RCALL delay_short
+    DEC   R20
+    BRNE  l1
+    RET
+;--------------------------------------------------
+delay_ms:               ;delay approximately 20ms
+    LDI   R21, 40
+l2: RCALL delay_us
+    DEC   R21
+    BRNE  l2
+    RET
+;----------------------------------------------------------------
+delay_sec:              ;nested loop subroutine (max delay 3.11s)
+    LDI   R20, 255      ;outer loop counter 
+l3: LDI   R21, 255      ;mid loop counter
+l4: LDI   R22, 40       ;inner loop counter to give 0.5s delay
+l5: DEC   R22           ;decrement inner loop
+    BRNE  l5            ;loop if not zero
+    DEC   R21           ;decrement mid loop
+    BRNE  l4            ;loop if not zero
+    DEC   R20           ;decrement outer loop
+    BRNE  l3            ;loop if not zero
+    RET                 ;return to caller
+;====================================================================
+disp_msg:
+    LDI   R31, hi8(msg)
+    LDI   R30, lo8(msg) ;Z points to string msg
+l6: LPM   R16, Z+       ;load character of msg into R16
+    CPI   R16, 0        ;check if R16=0 (end of string)
+    BREQ  ext           ;if yes, exit
+    RCALL data_wrt      ;if no, display character on LCD
+    RJMP  l6            ;loop back & get next character
+ext:RET
+;--------------------------------------------------------------------
+msg: .ascii "Distance(cm):" ;use even number of chars in string
+;====================================================================
+read_distance:
+    RCALL HC_SR04_sensor ;call the ultrasonic sensor routine
+    RCALL byte2decimal   ;convert distance to decimal
+    ;--------------------------------------------------------
+    MOV   R18, R26
+    LDI   R16, 0xC1     ;cursor position for MSD
+    RCALL command_wrt
+    ADD   R18, R19      ;MSD in ASCII dec
+    MOV   R16, R18
+    RCALL data_wrt      ;display MSD on LCD
+    ;--------------------------------------------------------
+    MOV   R18, R27
+    LDI   R16, 0xC2     ;cursor position for LSD
+    RCALL command_wrt
+    ADD   R18, R19
+    MOV   R16, R18
+    RCALL data_wrt      ;display LSD on LCD
+    ;--------------------------------------------------------
+    RCALL delay_sec     ;delay 0.5s
+    ;--------------------------------------------------------
+    LDI   R16, 0xC0     ;force cursor beginning of 2nd line
+    RCALL command_wrt
+    RCALL delay_ms
+    ;--------------------------------------------------------
+    RJMP  read_distance ;go back & get another distance reading
+;====================================================================
+HC_SR04_sensor:
+;--------------
+    SBI   DDRB, 1         ;pin PB1 as o/p (Trigger)
+    CBI   DDRB, 0         ;pin PB0 as i/p (Echo)
+    ;-----------------------------------------------------------
+agn:SBI   PORTB, 1
+    RCALL delay_timer0
+    CBI   PORTB, 1        ;send 10us high pulse to sensor
+    ;-----------------------------------------------------------
+    RCALL echo_PW         ;compute Echo pulse width count
+    ;-----------------------------------------------------------
+    RET
+;===============================================================
+echo_PW:
+;-------
+    LDI   R20, 0b00000000
+    STS   TCCR1A, R20     ;Timer 1 normal mode
+    LDI   R20, 0b00000001 ;prescale clk/1 (no prescale)
+    STS   TCCR1B, R20
+    ;-----------------------------------------------------------
+ewl:SBIC  PINB, 0         ;wait for PB0 (Echo) high
+    RJMP  ewl
+    STS   TCNT1H, R20     ;reset Timer1 counter (TCNT1)
+    STS   TCNT1L, R20
+    ;-----------------------------------------------------------
+ell:SBIS  PINB, 0         ;check PB0 (Echo) low
+    RJMP  ell
+    LDS   R26, TCNT1L     ;get LSB of TCNT1 in R26
+    LDS   R27, TCNT1H     ;get MSB of TCNT1 in R27
+    ;-----------------------------------------------------------
+    LDI   R18, 0b00000000 ;stop Timer 1
+    STS   TCCR1B, R18
+    RET
+;====================================================================
+delay_timer0:
+;------------
+    LDI   R20, 0b00000001 ;normal mode, prescale clk/1
+    OUT   TCCR0, R20
+    LDI   R20, 0b11111010 ;Timer 0 counter TCNT0
+    OUT   TCNT0, R20
+    ;-----------------------------------------------------------
+d0:SBIS  TIFR, TOV0       ;check for overflow
+    RJMP  d0              ;jump if no
+    LDI   R20, 0b00000001 ;clear TOV0 flag
+    OUT   TIFR, R20
+    RET
+;====================================================================
+byte2decimal:
+    ; Convert distance (R26:R27) to decimal for LCD display
+    LDI   R18, 0
+    LDI   R19, 48         ;ASCII offset
+    LDI   R20, 10
+    MOV   R25, R26
+    MOV   R26, R27
+    MOV   R27, R18
+    DIV   R26, R20        ; Divide R26 by 10
+    MOV   R18, R25        ; Get remainder
+    RET
