@@ -9,17 +9,17 @@
 - [Conclusion](#conclusion)
 
 ## Introduction
-This project involves creating a smart trash bin that automatically opens and closes using an ultrasonic sensor. It also measures the fill level of the bin using an IR sensor and provides visual feedback using LEDs. Additionally, it measures the weight of the trash using an HX711 weight sensor module. The system uses two Arduino boards communicating via I2C protocol: one Arduino handles sensor readings and weight measurement, and the other controls the motor and LEDs.
+This project involves creating a smart trash bin that automatically opens and closes using an IR sensor. It also measures the fill level of the bin using an Ultrasonic sensor and provides visual feedback using 7 segment display. Additionally, it measures the weight of the trash using an piezo sensor module and provides visual feedback using LCD 16x2. The system uses two Arduino boards communicating via I2C protocol: one Arduino handles sensor readings and weight measurement, and the other controls the motor, display distance from ultrasonic sensor, and LEDs.
 
 ## Components
 ### Sensors
 - Ultrasonic sensor
 - IR sensor
-- HX711 weight sensor module
+- Piezo sensor
 
 ### Actuators
-- Servo motor
-- 5 LEDs
+- motor DC with l298n motor drivers
+- 3 LEDs
 
 ### Others
 - 2 Arduino boards
