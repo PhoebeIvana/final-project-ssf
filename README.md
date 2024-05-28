@@ -47,8 +47,8 @@ This project involves creating a smart trash bin that automatically opens and cl
 - PZ to Analog Pin 0
 
 ### Motor DC
-- VCC to 5V
-- GND to GND
+- VCC to OUT1
+- GND to OUT2
 
 ### LEDs
 - Connect 5 LEDs in series with 220-ohm resistors
