@@ -46,7 +46,7 @@ This project involves creating a smart trash bin that automatically opens and cl
 - GND to GND
 - PZ to Analog Pin 0
 
-### Servo Motor
+### Motor DC
 - VCC to 5V
 - GND to GND
 - Signal to Digital Pin 6
