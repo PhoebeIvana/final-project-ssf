@@ -49,7 +49,6 @@ This project involves creating a smart trash bin that automatically opens and cl
 ### Motor DC
 - VCC to 5V
 - GND to GND
-- Signal to Digital Pin 6
 
 ### LEDs
 - Connect 5 LEDs in series with 220-ohm resistors
